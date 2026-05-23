@@ -7,7 +7,7 @@
  *   que lo necesiten, sin repetir código en cada página.
  */
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://fine-shoes-production.up.railway.app';
 
 // ── Token helpers ──────────────────────────────────────────────
 export function getToken()        { return localStorage.getItem('fs_token'); }
