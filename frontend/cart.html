@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Carrito</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+  <ul class="navbar__links">
+    <li><a href="index.html">← Seguir comprando</a></li>
+  </ul>
+  <div class="navbar__actions">
+    <a href="cart.html" class="navbar__cart-btn">
+      🛒 Carrito <span class="cart-badge" style="display:none">0</span>
+    </a>
+    <button id="nav-logout" class="btn btn-outline btn-sm">Salir</button>
+  </div>
+</nav>
+
+<div class="cart-container" style="padding-top:2rem">
+  <!-- Items -->
+  <div>
+    <h1 class="section-title">Tu carrito</h1>
+    <div id="cart-items">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="order-summary">
+    <p class="order-summary__title">Resumen</p>
+    <div id="summary-rows"></div>
+    <div class="summary-total">
+      <span>Total</span>
+      <span id="summary-total">$0.00</span>
+    </div>
+    <button class="btn btn-primary" id="checkout-btn"
+            style="width:100%;margin-top:1.25rem" disabled>
+      Proceder al pago
+    </button>
+    <a href="index.html" class="btn btn-outline"
+       style="width:100%;margin-top:.6rem;text-align:center">
+      Seguir comprando
+    </a>
+  </div>
+</div>
+
+<script type="module">
+  import { cart, requireAuth, logout, showToast } from './js/api.js';
+
+  if (!requireAuth()) throw new Error('not logged in');
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  let cartData = null;
+
+  // ── Render del carrito ────────────────────────────────────
+  function renderCart(data) {
+    cartData = data;
+    const container = document.getElementById('cart-items');
+    const summaryRows = document.getElementById('summary-rows');
+    const totalEl = document.getElementById('summary-total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+
+    if (!data.items.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon">🛒</div>
+          <div class="empty-state__title">Tu carrito está vacío</div>
+          <p>Explora el catálogo y agrega tus favoritos</p>
+          <a href="index.html" class="btn btn-primary" style="margin-top:1rem">Ver catálogo</a>
+        </div>`;
+      summaryRows.innerHTML = '';
+      totalEl.textContent = '$0.00 MXN';
+      checkoutBtn.disabled = true;
+      return;
+    }
+
+    // Items
+    container.innerHTML = data.items.map(item => `
+      <div class="cart-item" id="item-${item.id}">
+        <img class="cart-item__img"
+             src="${item.image_url || 'https://placehold.co/80x80/111/555?text=👟'}"
+             alt="${item.product_name}"
+             onerror="this.src='https://placehold.co/80x80/111/555?text=👟'">
+        <div class="cart-item__info">
+          <p class="cart-item__brand">${item.brand_name}</p>
+          <p class="cart-item__name">${item.product_name}</p>
+          <p class="cart-item__meta">Talla: ${item.size} · Color: ${item.color}</p>
+          <p class="cart-item__meta" style="color:var(--gold)">
+            $${Number(item.unit_price).toLocaleString('es-MX',{minimumFractionDigits:2})} c/u
+          </p>
+          <div class="cart-item__qty">
+            <button class="qty-btn" onclick="changeQty(${item.id}, ${item.quantity - 1})">−</button>
+            <span style="min-width:28px;text-align:center;font-weight:500">${item.quantity}</span>
+            <button class="qty-btn" onclick="changeQty(${item.id}, ${item.quantity + 1})">+</button>
+            <button class="btn btn-sm" style="color:var(--danger);margin-left:.5rem"
+                    onclick="removeItem(${item.id})">✕ Eliminar</button>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <p style="font-weight:600;font-size:1rem">
+            $${Number(item.subtotal).toLocaleString('es-MX',{minimumFractionDigits:2})}
+          </p>
+        </div>
+      </div>
+    `).join('');
+
+    // Filas de resumen
+    summaryRows.innerHTML = data.items.map(item => `
+      <div class="summary-row">
+        <span>${item.product_name} ×${item.quantity}</span>
+        <span>$${Number(item.subtotal).toLocaleString('es-MX',{minimumFractionDigits:2})}</span>
+      </div>
+    `).join('') + `
+      <div class="summary-row">
+        <span>Envío</span>
+        <span style="color:var(--success)">Gratis</span>
+      </div>`;
+
+    totalEl.textContent = '$' + Number(data.total).toLocaleString('es-MX',{minimumFractionDigits:2}) + ' MXN';
+    checkoutBtn.disabled = false;
+  }
+
+  // ── Cambiar cantidad ──────────────────────────────────────
+  window.changeQty = async (itemId, newQty) => {
+    if (newQty < 1) { removeItem(itemId); return; }
+    if (newQty > 10) { showToast('Máximo 10 unidades por producto', 'error'); return; }
+    try {
+      const data = await cart.update(itemId, newQty);
+      renderCart(data);
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // ── Eliminar item ─────────────────────────────────────────
+  window.removeItem = async (itemId) => {
+    try {
+      const data = await cart.remove(itemId);
+      renderCart(data);
+      showToast('Producto eliminado', 'info');
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // ── Ir al checkout ────────────────────────────────────────
+  document.getElementById('checkout-btn').addEventListener('click', () => {
+    window.location.href = 'checkout.html';
+  });
+
+  // ── Cargar carrito inicial ────────────────────────────────
+  cart.get().then(renderCart).catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>

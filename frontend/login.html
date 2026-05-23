@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Iniciar sesión</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+</nav>
+
+<div class="form-card">
+  <h1 class="form-card__title">Bienvenido</h1>
+  <p class="form-card__sub">Ingresa a tu cuenta para continuar</p>
+
+  <form id="login-form" novalidate>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="email" placeholder="tu@email.com" required>
+      <p class="form-error" id="email-err"></p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••" required>
+      <p class="form-error" id="pass-err"></p>
+    </div>
+
+    <p class="form-error" id="global-err" style="margin-bottom:.75rem"></p>
+
+    <button type="submit" class="btn btn-primary" style="width:100%" id="submit-btn">
+      Ingresar
+    </button>
+  </form>
+
+  <div class="form-divider">o</div>
+  <p style="text-align:center;font-size:.88rem;color:var(--gray)">
+    ¿No tienes cuenta?
+    <a href="register.html" style="color:var(--gold)">Regístrate</a>
+  </p>
+
+  <!-- Hint de prueba -->
+  <div style="margin-top:1.5rem;padding:1rem;background:var(--bg3);border-radius:var(--radius);font-size:.8rem;color:var(--gray)">
+    <strong style="color:var(--gold)">Admin demo:</strong><br>
+    admin@fineshoes.com / Admin1234!
+  </div>
+</div>
+
+<script type="module">
+  import { auth, setToken, setUser, isLoggedIn, showToast } from './js/api.js';
+
+  // Si ya está logueado, redirigir
+  if (isLoggedIn()) window.location.href = 'index.html';
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const errEl = document.getElementById('global-err');
+
+    // Limpiar errores anteriores
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Ingresando...';
+
+    try {
+      const res = await auth.login({
+        email:    document.getElementById('email').value,
+        password: document.getElementById('password').value,
+      });
+      setToken(res.access_token);
+      setUser(res.user);
+      // Redirigir según rol
+      window.location.href = res.user.role === 'admin' ? 'admin/dashboard.html' : 'index.html';
+    } catch (err) {
+      errEl.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = 'Ingresar';
+    }
+  });
+</script>
+</body>
+</html>

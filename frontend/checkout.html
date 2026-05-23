@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Checkout</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+  <ul class="navbar__links">
+    <li><a href="cart.html">← Carrito</a></li>
+  </ul>
+  <div class="navbar__actions">
+    <button id="nav-logout" class="btn btn-outline btn-sm">Salir</button>
+  </div>
+</nav>
+
+<!-- Steps visuales -->
+<div style="display:flex;justify-content:center;gap:0;margin:2rem 0 0">
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <span style="width:28px;height:28px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700">✓</span>
+    <span style="font-size:.78rem;color:var(--gold);text-transform:uppercase;letter-spacing:.1em">Carrito</span>
+  </div>
+  <div style="width:60px;height:1px;background:var(--gold);margin:0 .75rem;align-self:center"></div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <span style="width:28px;height:28px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700">2</span>
+    <span style="font-size:.78rem;color:var(--gold);text-transform:uppercase;letter-spacing:.1em">Envío</span>
+  </div>
+  <div style="width:60px;height:1px;background:var(--border);margin:0 .75rem;align-self:center"></div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <span style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem">3</span>
+    <span style="font-size:.78rem;color:var(--gray);text-transform:uppercase;letter-spacing:.1em">Confirmación</span>
+  </div>
+</div>
+
+<div id="checkout-view" class="cart-container" style="padding-top:1.5rem">
+  <!-- Formulario de envío -->
+  <div>
+    <h1 class="section-title">Datos de envío</h1>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
+
+      <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:1.5rem;font-size:.82rem;color:var(--gold)">
+        ℹ️ Este es un pago simulado — no se realizará ningún cargo real.
+      </div>
+
+      <form id="checkout-form" novalidate>
+        <div class="form-group">
+          <label class="form-label">Nombre completo para envío</label>
+          <input type="text" id="shipping-name" required placeholder="Nombre Apellido">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dirección de envío</label>
+          <input type="text" id="shipping-address" required placeholder="Calle, Número, Colonia, Ciudad">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono de contacto</label>
+          <input type="tel" id="shipping-phone" required placeholder="+52 000 000 0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas del pedido <span style="color:var(--gray)">(opcional)</span></label>
+          <textarea id="notes" rows="2" placeholder="Instrucciones especiales..."></textarea>
+        </div>
+        <p class="form-error" id="form-err"></p>
+      </form>
+
+      <!-- Pago simulado -->
+      <div style="margin-top:1.5rem">
+        <p class="form-label" style="margin-bottom:.75rem">Método de pago (simulado)</p>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:.88rem;color:var(--gray)">
+          💳 Tarjeta terminada en <strong style="color:var(--white)">•••• 4242</strong>
+          <span style="float:right;color:var(--success)">✓ Verificada</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen lateral -->
+  <div class="order-summary">
+    <p class="order-summary__title">Resumen del pedido</p>
+    <div id="checkout-summary">
+      <div class="spinner"></div>
+    </div>
+    <div class="summary-total">
+      <span>Total</span>
+      <span id="checkout-total">—</span>
+    </div>
+    <div class="summary-row" style="border:none">
+      <span style="color:var(--success)">🚚 Envío</span>
+      <span style="color:var(--success)">Gratis</span>
+    </div>
+    <button class="btn btn-primary" id="place-order-btn"
+            style="width:100%;margin-top:1rem" disabled>
+      Confirmar pedido
+    </button>
+  </div>
+</div>
+
+<!-- Vista de confirmación (oculta hasta completar el pedido) -->
+<div id="confirmation-view" style="display:none;max-width:540px;margin:4rem auto;padding:0 2rem;text-align:center">
+  <div style="font-size:4rem;margin-bottom:1rem">🎉</div>
+  <h1 class="section-title" style="margin-bottom:.5rem">¡Pedido confirmado!</h1>
+  <p style="color:var(--gray);margin-bottom:.5rem">Pedido #<strong id="conf-order-id" style="color:var(--gold)"></strong></p>
+  <p style="color:var(--gray);margin-bottom:2rem">Gracias por tu compra. Puedes revisar el estado en tus pedidos.</p>
+  <div style="display:flex;gap:1rem;justify-content:center">
+    <a href="orders.html" class="btn btn-primary">Ver mis pedidos</a>
+    <a href="index.html" class="btn btn-outline">Seguir comprando</a>
+  </div>
+</div>
+
+<script type="module">
+  import { cart, orders, requireAuth, logout, showToast } from './js/api.js';
+
+  if (!requireAuth()) throw new Error('not logged in');
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  // ── Cargar resumen del carrito ────────────────────────────
+  async function loadSummary() {
+    const data = await cart.get();
+    if (!data.items.length) {
+      window.location.href = 'cart.html'; return;
+    }
+
+    document.getElementById('checkout-summary').innerHTML = data.items.map(i => `
+      <div class="summary-row">
+        <span>${i.product_name} ×${i.quantity}<br>
+          <small style="color:var(--gray)">${i.size} · ${i.color}</small>
+        </span>
+        <span>$${Number(i.subtotal).toLocaleString('es-MX',{minimumFractionDigits:2})}</span>
+      </div>
+    `).join('');
+
+    document.getElementById('checkout-total').textContent =
+      '$' + Number(data.total).toLocaleString('es-MX',{minimumFractionDigits:2}) + ' MXN';
+
+    document.getElementById('place-order-btn').disabled = false;
+  }
+
+  loadSummary().catch(e => showToast(e.message, 'error'));
+
+  // ── Confirmar pedido ──────────────────────────────────────
+  document.getElementById('place-order-btn').addEventListener('click', async () => {
+    const name    = document.getElementById('shipping-name').value.trim();
+    const address = document.getElementById('shipping-address').value.trim();
+    const phone   = document.getElementById('shipping-phone').value.trim();
+    const errEl   = document.getElementById('form-err');
+    errEl.textContent = '';
+
+    if (!name || !address || !phone) {
+      errEl.textContent = 'Por favor completa todos los campos requeridos.';
+      return;
+    }
+
+    const btn = document.getElementById('place-order-btn');
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+
+    try {
+      const order = await orders.checkout({
+        shipping_name:    name,
+        shipping_address: address,
+        shipping_phone:   phone,
+        notes: document.getElementById('notes').value || null,
+      });
+
+      // Mostrar confirmación
+      document.getElementById('checkout-view').style.display = 'none';
+      document.getElementById('confirmation-view').style.display = 'block';
+      document.getElementById('conf-order-id').textContent = order.id;
+
+    } catch (e) {
+      showToast(e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Confirmar pedido';
+    }
+  });
+</script>
+</body>
+</html>

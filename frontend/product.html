@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Producto</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+  <ul class="navbar__links">
+    <li><a href="index.html">← Catálogo</a></li>
+  </ul>
+  <div class="navbar__actions">
+    <a href="cart.html" class="navbar__cart-btn">
+      🛒 Carrito <span class="cart-badge" style="display:none">0</span>
+    </a>
+    <a href="login.html" id="nav-login" class="btn btn-outline btn-sm">Ingresar</a>
+    <button id="nav-logout" class="btn btn-outline btn-sm" style="display:none">Salir</button>
+  </div>
+</nav>
+
+<div id="content">
+  <div class="loading-state"><div class="spinner"></div></div>
+</div>
+
+<script type="module">
+  import { products, cart, isLoggedIn, logout, refreshCartBadge, showToast } from './js/api.js';
+
+  if (isLoggedIn()) {
+    document.getElementById('nav-login').style.display = 'none';
+    document.getElementById('nav-logout').style.display = '';
+  }
+  document.getElementById('nav-logout')?.addEventListener('click', logout);
+  refreshCartBadge();
+
+  // Leer ?id= de la URL
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { window.location.href = 'index.html'; }
+
+  let selectedInventoryId = null;
+
+  async function load() {
+    const p = await products.get(id);
+
+    // Calcular tallas y colores únicos
+    const sizes  = [...new Set(p.inventory.map(i => i.size))];
+    const colors = [...new Set(p.inventory.map(i => i.color))];
+
+    document.getElementById('content').innerHTML = `
+      <section class="product-detail">
+        <!-- Imagen -->
+        <div class="product-gallery__main">
+          <img src="${p.image_url || 'https://placehold.co/600x600/111/555?text=Shoe'}"
+               alt="${p.name}" style="height:100%;object-fit:cover"
+               onerror="this.src='https://placehold.co/600x600/111/555?text=Shoe'">
+        </div>
+
+        <!-- Info -->
+        <div class="product-info">
+          <p class="product-info__brand">${p.brand_name}</p>
+          <h1 class="product-info__name">${p.name}</h1>
+          <p class="product-info__price">
+            $${Number(p.price).toLocaleString('es-MX', {minimumFractionDigits:2})}
+            <span style="font-size:1rem;color:var(--gray)"> MXN</span>
+          </p>
+
+          ${p.description ? `<p style="color:var(--gray);margin-bottom:1.5rem">${p.description}</p>` : ''}
+
+          <!-- Selector de talla -->
+          <div class="variant-selector">
+            <p class="variant-selector__label">Talla</p>
+            <div class="variant-chips" id="size-select">
+              ${sizes.map(s => `
+                <button class="variant-chip" data-size="${s}">${s}</button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Selector de color -->
+          <div class="variant-selector" id="color-variant" style="display:none">
+            <p class="variant-selector__label">Color</p>
+            <div class="variant-chips" id="color-select"></div>
+          </div>
+
+          <p id="stock-info" style="font-size:.82rem;color:var(--gray);margin-bottom:1.25rem"></p>
+
+          <button class="btn btn-primary" id="add-cart-btn" style="width:100%" disabled>
+            Selecciona talla y color
+          </button>
+        </div>
+      </section>
+    `;
+
+    // ── Lógica de selección de variantes ──────────────────
+    let selectedSize = null;
+    let selectedColor = null;
+
+    function updateColorOptions() {
+      const colorContainer = document.getElementById('color-select');
+      const colorVariant   = document.getElementById('color-variant');
+      const btn            = document.getElementById('add-cart-btn');
+
+      // Filtrar variantes disponibles para la talla seleccionada
+      const available = p.inventory.filter(i => i.size === selectedSize);
+      colorContainer.innerHTML = available.map(i => `
+        <button class="variant-chip ${i.stock === 0 ? 'out-of-stock' : ''}"
+                data-inv="${i.id}" data-color="${i.color}"
+                ${i.stock === 0 ? 'disabled' : ''}>
+          ${i.color}
+        </button>
+      `).join('');
+
+      colorVariant.style.display = 'block';
+      selectedColor = null;
+      selectedInventoryId = null;
+      btn.disabled = true;
+      btn.textContent = 'Selecciona color';
+
+      // Listener en chips de color
+      colorContainer.querySelectorAll('.variant-chip:not(.out-of-stock)').forEach(chip => {
+        chip.addEventListener('click', () => {
+          colorContainer.querySelectorAll('.variant-chip').forEach(c => c.classList.remove('selected'));
+          chip.classList.add('selected');
+          selectedColor = chip.dataset.color;
+          selectedInventoryId = parseInt(chip.dataset.inv);
+
+          const inv = p.inventory.find(i => i.id === selectedInventoryId);
+          document.getElementById('stock-info').textContent =
+            inv ? `${inv.stock} disponibles` : '';
+
+          btn.disabled = false;
+          btn.textContent = 'Agregar al carrito';
+        });
+      });
+    }
+
+    // Listener en chips de talla
+    document.querySelectorAll('#size-select .variant-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#size-select .variant-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedSize = chip.dataset.size;
+        updateColorOptions();
+      });
+    });
+
+    // ── Agregar al carrito ─────────────────────────────────
+    document.getElementById('add-cart-btn').addEventListener('click', async () => {
+      if (!isLoggedIn()) {
+        showToast('Inicia sesión para agregar al carrito', 'error');
+        setTimeout(() => window.location.href = 'login.html', 1500);
+        return;
+      }
+      if (!selectedInventoryId) return;
+
+      const btn = document.getElementById('add-cart-btn');
+      btn.disabled = true;
+      btn.textContent = 'Agregando...';
+
+      try {
+        await cart.add({ inventory_id: selectedInventoryId, quantity: 1 });
+        showToast('¡Agregado al carrito! 🛒', 'success');
+        refreshCartBadge();
+        btn.textContent = '✓ En el carrito';
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Agregar al carrito';
+      }
+    });
+  }
+
+  load().catch(e => {
+    document.getElementById('content').innerHTML =
+      `<div class="empty-state"><div class="empty-state__title">Producto no encontrado</div></div>`;
+  });
+</script>
+</body>
+</html>

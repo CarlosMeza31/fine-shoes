@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Reportes</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <!-- Chart.js para gráficas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="navbar">
+  <a href="../index.html" class="navbar__logo">Fine Shoes</a>
+  <span style="font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);background:rgba(201,168,76,.1);padding:.2rem .6rem;border-radius:999px;border:1px solid rgba(201,168,76,.3)">Panel Admin</span>
+  <div style="margin-left:auto">
+    <button id="nav-logout" class="btn btn-outline btn-sm">Cerrar sesión</button>
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <p class="admin-sidebar__title">Navegación</p>
+    <a href="dashboard.html" class="admin-nav-item">📊 Dashboard</a>
+    <a href="products.html"  class="admin-nav-item">👟 Productos</a>
+    <a href="orders.html"    class="admin-nav-item">📦 Pedidos</a>
+    <a href="reports.html"   class="admin-nav-item active">📈 Reportes</a>
+    <hr style="border-color:var(--border);margin:1rem 0">
+    <a href="../index.html"  class="admin-nav-item">🏪 Ver tienda</a>
+  </aside>
+
+  <main class="admin-content">
+    <div class="admin-content__header">
+      <h1 class="admin-content__title">Reportes</h1>
+      <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Imprimir</button>
+    </div>
+
+    <!-- Fila 1: gráfica de ventas por mes + top productos -->
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+
+      <!-- Gráfica ventas mensuales -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
+        <h2 style="font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:1.25rem">
+          Ventas por mes
+        </h2>
+        <canvas id="monthly-chart" height="220"></canvas>
+      </div>
+
+      <!-- Top productos (gráfica donut) -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
+        <h2 style="font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:1.25rem">
+          Top 5 productos
+        </h2>
+        <canvas id="top-chart" height="220"></canvas>
+      </div>
+
+    </div>
+
+    <!-- Fila 2: tabla top productos + stock bajo -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+      <!-- Tabla top productos -->
+      <div>
+        <h2 style="font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:.75rem">
+          Productos más vendidos
+        </h2>
+        <div class="table-wrap" id="top-table">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Stock bajo -->
+      <div>
+        <h2 style="font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:var(--danger);margin-bottom:.75rem">
+          ⚠ Stock bajo (≤ 5)
+        </h2>
+        <div class="table-wrap" id="low-stock-table">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { reports, requireAuth, logout, showToast } from '../js/api.js';
+
+  if (!requireAuth(true)) throw new Error();
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  // ── Estilos globales de Chart.js ──────────────────────────
+  Chart.defaults.color = '#888';
+  Chart.defaults.borderColor = '#2a2a2a';
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+  // ── Gráfica de ventas por mes ─────────────────────────────
+  async function loadMonthlyChart() {
+    const data = await reports.byMonth();
+    const labels  = data.map(d => d.month);
+    const revenue = data.map(d => d.total_revenue);
+    const orderCount = data.map(d => d.total_orders);
+
+    new Chart(document.getElementById('monthly-chart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Ingresos ($)',
+            data: revenue,
+            backgroundColor: 'rgba(201,168,76,.25)',
+            borderColor: '#c9a84c',
+            borderWidth: 2,
+            borderRadius: 4,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Pedidos',
+            data: orderCount,
+            type: 'line',
+            borderColor: '#4caf7d',
+            backgroundColor: 'rgba(76,175,125,.08)',
+            tension: .4,
+            pointRadius: 4,
+            yAxisID: 'y1',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y:  { position: 'left',  grid: { color: '#1a1a1a' } },
+          y1: { position: 'right', grid: { display: false } },
+        },
+        plugins: { legend: { labels: { boxWidth: 12 } } },
+      },
+    });
+  }
+
+  // ── Gráfica donut top productos ───────────────────────────
+  async function loadTopChart() {
+    const data = await reports.byProduct(5);
+    if (!data.length) return;
+
+    new Chart(document.getElementById('top-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => d.product_name.split(' ').slice(0,3).join(' ')),
+        datasets: [{
+          data: data.map(d => d.total_sold),
+          backgroundColor: ['#c9a84c','#4caf7d','#63b3ed','#e05252','#888'],
+          borderWidth: 0,
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } },
+          tooltip: { callbacks: {
+            label: (ctx) => ` ${ctx.label}: ${ctx.raw} unidades`
+          }},
+        },
+        cutout: '65%',
+      },
+    });
+  }
+
+  // ── Tabla top 10 productos ────────────────────────────────
+  async function loadTopTable() {
+    const data = await reports.byProduct(10);
+    const el = document.getElementById('top-table');
+    if (!data.length) {
+      el.innerHTML = '<p style="padding:1rem;color:var(--gray)">Sin ventas registradas</p>'; return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Producto</th><th>Marca</th><th>Uds.</th><th>Total</th></tr></thead>
+        <tbody>
+          ${data.map((p,i) => `
+            <tr>
+              <td style="color:var(--gold);font-weight:700">${i+1}</td>
+              <td>${p.product_name}</td>
+              <td style="color:var(--gray)">${p.brand}</td>
+              <td><strong>${p.total_sold}</strong></td>
+              <td style="color:var(--gold)">
+                $${Number(p.total_revenue).toLocaleString('es-MX',{minimumFractionDigits:0})}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Tabla stock bajo ──────────────────────────────────────
+  async function loadLowStock() {
+    const data = await reports.lowStock(5);
+    const el = document.getElementById('low-stock-table');
+    if (!data.length) {
+      el.innerHTML = '<p style="padding:1rem;color:var(--success)">✓ Todo el inventario está bien</p>'; return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Producto</th><th>Talla</th><th>Color</th><th>Stock</th></tr></thead>
+        <tbody>
+          ${data.map(i => `
+            <tr>
+              <td>
+                <p style="font-size:.85rem">${i.product_name}</p>
+                <p style="font-size:.72rem;color:var(--gray)">${i.brand}</p>
+              </td>
+              <td><span class="badge badge-pending">${i.size}</span></td>
+              <td style="font-size:.85rem">${i.color}</td>
+              <td>
+                <span style="color:${i.stock === 0 ? 'var(--danger)' : 'var(--gold)'};font-weight:700">
+                  ${i.stock}
+                </span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  Promise.all([
+    loadMonthlyChart(),
+    loadTopChart(),
+    loadTopTable(),
+    loadLowStock(),
+  ]).catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>

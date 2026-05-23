@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Gestión de Productos</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="../index.html" class="navbar__logo">Fine Shoes</a>
+  <span style="font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);background:rgba(201,168,76,.1);padding:.2rem .6rem;border-radius:999px;border:1px solid rgba(201,168,76,.3)">Panel Admin</span>
+  <div style="margin-left:auto">
+    <button id="nav-logout" class="btn btn-outline btn-sm">Cerrar sesión</button>
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <p class="admin-sidebar__title">Navegación</p>
+    <a href="dashboard.html" class="admin-nav-item">📊 Dashboard</a>
+    <a href="products.html"  class="admin-nav-item active">👟 Productos</a>
+    <a href="orders.html"    class="admin-nav-item">📦 Pedidos</a>
+    <a href="reports.html"   class="admin-nav-item">📈 Reportes</a>
+    <hr style="border-color:var(--border);margin:1rem 0">
+    <a href="../index.html"  class="admin-nav-item">🏪 Ver tienda</a>
+  </aside>
+
+  <main class="admin-content">
+    <div class="admin-content__header">
+      <h1 class="admin-content__title">Productos</h1>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn btn-outline btn-sm" id="import-btn">⬇ Importar de API</button>
+        <button class="btn btn-primary" id="new-product-btn">+ Nuevo producto</button>
+      </div>
+    </div>
+
+    <!-- Buscador -->
+    <div style="margin-bottom:1.25rem;max-width:360px">
+      <input type="search" id="search-input" placeholder="Buscar producto...">
+    </div>
+
+    <div class="table-wrap" id="products-table">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Modal crear / editar producto ─────────────────────── -->
+<div class="modal-overlay" id="product-modal" style="display:none">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" id="modal-title">Nuevo producto</h2>
+      <button onclick="closeModal()" style="color:var(--gray);font-size:1.3rem">✕</button>
+    </div>
+
+    <form id="product-form" novalidate>
+      <input type="hidden" id="edit-id">
+
+      <div class="form-group">
+        <label class="form-label">Marca</label>
+        <select id="brand-select"><option value="">Cargando...</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre del producto</label>
+        <input type="text" id="prod-name" required placeholder="Nike Air Max 270">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label class="form-label">Precio (MXN)</label>
+          <input type="number" id="prod-price" required min="1" placeholder="2999">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select id="prod-active">
+            <option value="true">Activo</option>
+            <option value="false">Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">URL de imagen</label>
+        <input type="url" id="prod-image" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea id="prod-desc" rows="3" placeholder="Descripción del producto..."></textarea>
+      </div>
+
+      <!-- Inventario inicial (solo al crear) -->
+      <div id="inventory-section">
+        <p class="form-label" style="margin-bottom:.5rem">Inventario inicial</p>
+        <div id="inventory-rows"></div>
+        <button type="button" class="btn btn-outline btn-sm" id="add-inv-row" style="margin-top:.5rem">
+          + Agregar talla / color
+        </button>
+      </div>
+
+      <p class="form-error" id="modal-err" style="margin-top:.75rem"></p>
+      <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+        <button type="submit" class="btn btn-primary" id="modal-save-btn" style="flex:1">Guardar</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal inventario (editar stock) ──────────────────── -->
+<div class="modal-overlay" id="inv-modal" style="display:none">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">Editar inventario</h2>
+      <button onclick="closeInvModal()" style="color:var(--gray);font-size:1.3rem">✕</button>
+    </div>
+    <div id="inv-modal-content"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { products, brands, requireAuth, logout, showToast } from '../js/api.js';
+
+  if (!requireAuth(true)) throw new Error();
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  let allProducts = [];
+  let brandList = [];
+
+  // ── Cargar marcas para el select ──────────────────────────
+  async function loadBrands() {
+    brandList = await brands.list();
+    const sel = document.getElementById('brand-select');
+    sel.innerHTML = brandList.map(b =>
+      `<option value="${b.id}">${b.name}</option>`
+    ).join('');
+  }
+
+  // ── Render tabla ──────────────────────────────────────────
+  function renderTable(list) {
+    const el = document.getElementById('products-table');
+    if (!list.length) {
+      el.innerHTML = '<p style="padding:1.5rem;color:var(--gray)">Sin productos</p>'; return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Imagen</th><th>Producto</th><th>Marca</th>
+            <th>Precio</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(p => `
+            <tr>
+              <td>
+                <img src="${p.image_url || 'https://placehold.co/48x48/111/555?text=👟'}"
+                     style="width:48px;height:48px;border-radius:4px;object-fit:cover"
+                     onerror="this.src='https://placehold.co/48x48/111/555?text=👟'">
+              </td>
+              <td>
+                <p style="font-weight:500">${p.name}</p>
+                <p style="font-size:.72rem;color:var(--gray)">${p.slug}</p>
+              </td>
+              <td>${p.brand_name}</td>
+              <td style="color:var(--gold)">
+                $${Number(p.price).toLocaleString('es-MX',{minimumFractionDigits:2})}
+              </td>
+              <td>
+                <span class="badge ${p.is_active ? 'badge-paid' : 'badge-cancelled'}">
+                  ${p.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex;gap:.5rem">
+                  <button class="btn btn-outline btn-sm" onclick="openEdit(${p.id})">Editar</button>
+                  <button class="btn btn-outline btn-sm" onclick="openInventory(${p.id})">Stock</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">✕</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Cargar todos los productos ────────────────────────────
+  async function loadProducts() {
+    const res = await products.list({ limit: 50 });
+    allProducts = res.products;
+    renderTable(allProducts);
+  }
+
+  // ── Búsqueda local ────────────────────────────────────────
+  document.getElementById('search-input').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allProducts.filter(p =>
+      p.name.toLowerCase().includes(q) || p.brand_name.toLowerCase().includes(q)
+    ));
+  });
+
+  // ── Abrir modal para nuevo producto ──────────────────────
+  window.openNew = () => {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('modal-title').textContent = 'Nuevo producto';
+    document.getElementById('product-form').reset();
+    document.getElementById('inventory-section').style.display = 'block';
+    document.getElementById('inventory-rows').innerHTML = '';
+    addInventoryRow();
+    document.getElementById('product-modal').style.display = 'flex';
+  };
+  document.getElementById('new-product-btn').addEventListener('click', openNew);
+
+  // ── Abrir modal para editar ───────────────────────────────
+  window.openEdit = async (id) => {
+    const p = await products.get(id);
+    document.getElementById('edit-id').value = p.id;
+    document.getElementById('modal-title').textContent = 'Editar producto';
+    document.getElementById('brand-select').value = p.brand_id;
+    document.getElementById('prod-name').value = p.name;
+    document.getElementById('prod-price').value = p.price;
+    document.getElementById('prod-image').value = p.image_url || '';
+    document.getElementById('prod-desc').value = p.description || '';
+    document.getElementById('prod-active').value = String(p.is_active);
+    document.getElementById('inventory-section').style.display = 'none'; // editar stock en modal aparte
+    document.getElementById('product-modal').style.display = 'flex';
+  };
+
+  // ── Filas de inventario dinámicas ─────────────────────────
+  window.addInventoryRow = () => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 80px 32px;gap:.5rem;margin-bottom:.4rem';
+    row.innerHTML = `
+      <input type="text" placeholder="Talla (ej: 42)">
+      <input type="text" placeholder="Color (ej: Negro)">
+      <input type="number" placeholder="Stock" min="0" value="10">
+      <button type="button" onclick="this.parentElement.remove()"
+              style="color:var(--danger);font-size:1.1rem">✕</button>`;
+    document.getElementById('inventory-rows').appendChild(row);
+  };
+  document.getElementById('add-inv-row').addEventListener('click', window.addInventoryRow);
+
+  // ── Cerrar modal ──────────────────────────────────────────
+  window.closeModal = () => {
+    document.getElementById('product-modal').style.display = 'none';
+    document.getElementById('modal-err').textContent = '';
+  };
+
+  // ── Guardar producto ──────────────────────────────────────
+  document.getElementById('product-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const editId = document.getElementById('edit-id').value;
+    const errEl = document.getElementById('modal-err');
+    errEl.textContent = '';
+
+    const data = {
+      brand_id:    parseInt(document.getElementById('brand-select').value),
+      name:        document.getElementById('prod-name').value,
+      price:       parseFloat(document.getElementById('prod-price').value),
+      image_url:   document.getElementById('prod-image').value || null,
+      description: document.getElementById('prod-desc').value || null,
+      is_active:   document.getElementById('prod-active').value === 'true',
+    };
+
+    // Leer filas de inventario (solo en creación)
+    if (!editId) {
+      const rows = document.querySelectorAll('#inventory-rows > div');
+      data.inventory = [...rows].map(row => {
+        const inputs = row.querySelectorAll('input');
+        return { size: inputs[0].value, color: inputs[1].value, stock: parseInt(inputs[2].value) || 0 };
+      }).filter(i => i.size && i.color);
+    }
+
+    const btn = document.getElementById('modal-save-btn');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+
+    try {
+      if (editId) {
+        await products.update(editId, data);
+        showToast('Producto actualizado ✓', 'success');
+      } else {
+        await products.create(data);
+        showToast('Producto creado ✓', 'success');
+      }
+      closeModal();
+      loadProducts();
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Guardar';
+    }
+  });
+
+  // ── Eliminar producto ─────────────────────────────────────
+  window.deleteProduct = async (id) => {
+    if (!confirm('¿Desactivar este producto?')) return;
+    try {
+      await products.delete(id);
+      showToast('Producto desactivado', 'info');
+      loadProducts();
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // ── Modal de inventario / stock ───────────────────────────
+  window.openInventory = async (id) => {
+    const p = await products.get(id);
+    const el = document.getElementById('inv-modal-content');
+    el.innerHTML = `
+      <p style="color:var(--gray);margin-bottom:1rem;font-size:.88rem">${p.name}</p>
+      ${p.inventory.map(inv => `
+        <div style="display:grid;grid-template-columns:80px 1fr 80px auto;gap:.75rem;
+                    align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border)">
+          <span class="badge badge-pending" style="text-align:center">${inv.size}</span>
+          <span style="font-size:.88rem">${inv.color}</span>
+          <input type="number" value="${inv.stock}" min="0"
+                 id="inv-stock-${inv.id}" style="width:80px;text-align:center">
+          <button class="btn btn-outline btn-sm"
+                  onclick="saveStock(${p.id}, ${inv.id}, '${inv.size}', '${inv.color}')">
+            Guardar
+          </button>
+        </div>
+      `).join('')}
+      <button type="button" onclick="closeInvModal()"
+              class="btn btn-primary" style="width:100%;margin-top:1.25rem">Cerrar</button>
+    `;
+    document.getElementById('inv-modal').style.display = 'flex';
+  };
+
+  window.saveStock = async (pid, iid, size, color) => {
+    const stock = parseInt(document.getElementById(`inv-stock-${iid}`).value);
+    try {
+      await products.updateInventory(pid, iid, { size, color, stock });
+      showToast('Stock actualizado ✓', 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  window.closeInvModal = () => {
+    document.getElementById('inv-modal').style.display = 'none';
+  };
+
+  // ── Importar desde API externa ────────────────────────────
+  document.getElementById('import-btn').addEventListener('click', async () => {
+    if (!confirm('¿Importar productos desde DummyJSON API?')) return;
+    const btn = document.getElementById('import-btn');
+    btn.disabled = true; btn.textContent = 'Importando...';
+    try {
+      const res = await products.importApi();
+      showToast(res.message, 'success');
+      loadProducts();
+    } catch (e) { showToast(e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = '⬇ Importar de API'; }
+  });
+
+  // ── Init ──────────────────────────────────────────────────
+  Promise.all([loadBrands(), loadProducts()]).catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>

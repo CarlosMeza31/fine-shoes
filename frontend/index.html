@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Catálogo</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────────── -->
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+  <ul class="navbar__links">
+    <li><a href="index.html">Catálogo</a></li>
+    <li><a href="#" id="nav-orders" style="display:none">Mis Pedidos</a></li>
+    <li><a href="admin/dashboard.html" id="nav-admin" style="display:none">Admin</a></li>
+  </ul>
+  <div class="navbar__search">
+    <input type="search" id="search-input" placeholder="Buscar sneakers...">
+  </div>
+  <div class="navbar__actions">
+    <a href="cart.html" class="navbar__cart-btn">
+      🛒 Carrito
+      <span class="cart-badge" style="display:none">0</span>
+    </a>
+    <a href="login.html" id="nav-login" class="btn btn-outline btn-sm">Ingresar</a>
+    <button id="nav-logout" class="btn btn-outline btn-sm" style="display:none">Salir</button>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────── -->
+<section class="hero" style="max-width:1280px">
+  <p class="hero__eyebrow">Nueva colección 2025</p>
+  <h1 class="hero__title">Sneakers<br>que definen<br>tu estilo</h1>
+  <p class="hero__sub">Explora las mejores marcas del mercado: Nike, Adidas, Jordan, New Balance y más.</p>
+  <a href="#catalog" class="btn btn-primary">Ver catálogo</a>
+</section>
+
+<!-- ── Catálogo ───────────────────────────────────────────── -->
+<section id="catalog" class="catalog-layout">
+
+  <!-- Filtros -->
+  <aside class="filters">
+    <p class="filters__title">Filtros</p>
+
+    <div class="filter-group">
+      <span class="filter-group__label">Marca</span>
+      <div class="filter-chips" id="brand-chips">
+        <span class="chip active" data-brand="">Todas</span>
+        <!-- Se llenan dinámicamente desde la API -->
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-group__label">Talla</span>
+      <div class="filter-chips" id="size-chips">
+        <span class="chip active" data-size="">Todas</span>
+        <span class="chip" data-size="38">38</span>
+        <span class="chip" data-size="39">39</span>
+        <span class="chip" data-size="40">40</span>
+        <span class="chip" data-size="41">41</span>
+        <span class="chip" data-size="42">42</span>
+        <span class="chip" data-size="43">43</span>
+        <span class="chip" data-size="44">44</span>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-group__label">Precio</span>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="number" id="min-price" placeholder="Mín" style="width:90px">
+        <span style="color:var(--gray)">—</span>
+        <input type="number" id="max-price" placeholder="Máx" style="width:90px">
+      </div>
+    </div>
+
+    <button class="btn btn-outline" id="clear-filters" style="width:100%;margin-top:.5rem">
+      Limpiar filtros
+    </button>
+  </aside>
+
+  <!-- Grid de productos -->
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <span class="section-title" id="results-count">Cargando...</span>
+    </div>
+    <div class="products-grid" id="products-grid">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+</section>
+
+<script type="module">
+  import { products, brands, isLoggedIn, isAdmin, logout,
+           refreshCartBadge, showToast } from './js/api.js';
+
+  // Estado de los filtros
+  const state = { brand: '', size: '', q: '', min_price: '', max_price: '', page: 1 };
+
+  // ── Mostrar/ocultar nav según sesión ──────────────────────
+  if (isLoggedIn()) {
+    document.getElementById('nav-login').style.display = 'none';
+    document.getElementById('nav-logout').style.display = '';
+    document.getElementById('nav-orders').style.display = '';
+    document.getElementById('nav-orders').href = 'orders.html';
+  }
+  if (isAdmin()) {
+    document.getElementById('nav-admin').style.display = '';
+  }
+  document.getElementById('nav-logout')?.addEventListener('click', logout);
+  refreshCartBadge();
+
+  // ── Cargar marcas en los chips ────────────────────────────
+  async function loadBrands() {
+    const data = await brands.list();
+    const container = document.getElementById('brand-chips');
+    data.forEach(b => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.dataset.brand = b.slug;
+      chip.textContent = b.name;
+      container.appendChild(chip);
+    });
+    attachChipListeners();
+  }
+
+  // ── Render de productos ───────────────────────────────────
+  function renderProducts(list) {
+    const grid = document.getElementById('products-grid');
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state__icon">👟</div>
+        <div class="empty-state__title">Sin resultados</div>
+        <p>Intenta con otros filtros</p>
+      </div>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(p => `
+      <a href="product.html?id=${p.id}" class="product-card">
+        <div class="product-card__img">
+          <img src="${p.image_url || 'https://placehold.co/400x300/111/555?text=Shoe'}"
+               alt="${p.name}" loading="lazy"
+               onerror="this.src='https://placehold.co/400x300/111/555?text=Shoe'">
+        </div>
+        <div class="product-card__body">
+          <p class="product-card__brand">${p.brand_name}</p>
+          <p class="product-card__name">${p.name}</p>
+          <p class="product-card__price">
+            $${Number(p.price).toLocaleString('es-MX', {minimumFractionDigits:2})}
+            <span>MXN</span>
+          </p>
+        </div>
+      </a>
+    `).join('');
+  }
+
+  // ── Paginación ────────────────────────────────────────────
+  function renderPagination(pagination) {
+    const container = document.getElementById('pagination');
+    if (pagination.pages <= 1) { container.innerHTML = ''; return; }
+
+    let html = '';
+    for (let i = 1; i <= pagination.pages; i++) {
+      html += `<button class="page-btn ${i === state.page ? 'active' : ''}"
+                        onclick="setPage(${i})">${i}</button>`;
+    }
+    container.innerHTML = html;
+  }
+
+  // ── Fetch y actualizar UI ─────────────────────────────────
+  async function loadProducts() {
+    document.getElementById('products-grid').innerHTML =
+      '<div class="loading-state"><div class="spinner"></div></div>';
+    try {
+      const res = await products.list({ ...state });
+      const count = document.getElementById('results-count');
+      count.textContent = `${res.pagination.total} productos`;
+      renderProducts(res.products);
+      renderPagination(res.pagination);
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  window.setPage = (n) => { state.page = n; loadProducts(); };
+
+  // ── Chips de filtro ───────────────────────────────────────
+  function attachChipListeners() {
+    document.querySelectorAll('#brand-chips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#brand-chips .chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.brand = chip.dataset.brand;
+        state.page = 1;
+        loadProducts();
+      });
+    });
+
+    document.querySelectorAll('#size-chips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#size-chips .chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.size = chip.dataset.size;
+        state.page = 1;
+        loadProducts();
+      });
+    });
+  }
+
+  // ── Búsqueda con debounce ─────────────────────────────────
+  // debounce: espera 400ms después de que el usuario deja de escribir
+  // — evita mandar una petición por cada tecla presionada
+  let searchTimer;
+  document.getElementById('search-input').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      loadProducts();
+    }, 400);
+  });
+
+  // ── Filtro de precio ──────────────────────────────────────
+  let priceTimer;
+  ['min-price','max-price'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      clearTimeout(priceTimer);
+      priceTimer = setTimeout(() => {
+        state.min_price = document.getElementById('min-price').value;
+        state.max_price = document.getElementById('max-price').value;
+        state.page = 1;
+        loadProducts();
+      }, 600);
+    });
+  });
+
+  // ── Limpiar filtros ───────────────────────────────────────
+  document.getElementById('clear-filters').addEventListener('click', () => {
+    Object.assign(state, { brand:'', size:'', q:'', min_price:'', max_price:'', page:1 });
+    document.getElementById('search-input').value = '';
+    document.getElementById('min-price').value = '';
+    document.getElementById('max-price').value = '';
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-brand=""]').classList.add('active');
+    document.querySelector('[data-size=""]').classList.add('active');
+    loadProducts();
+  });
+
+  // ── Inicializar ───────────────────────────────────────────
+  loadBrands();
+  loadProducts();
+</script>
+</body>
+</html>

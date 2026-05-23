@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Gestión de Pedidos</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="../index.html" class="navbar__logo">Fine Shoes</a>
+  <span style="font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);background:rgba(201,168,76,.1);padding:.2rem .6rem;border-radius:999px;border:1px solid rgba(201,168,76,.3)">Panel Admin</span>
+  <div style="margin-left:auto">
+    <button id="nav-logout" class="btn btn-outline btn-sm">Cerrar sesión</button>
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <p class="admin-sidebar__title">Navegación</p>
+    <a href="dashboard.html" class="admin-nav-item">📊 Dashboard</a>
+    <a href="products.html"  class="admin-nav-item">👟 Productos</a>
+    <a href="orders.html"    class="admin-nav-item active">📦 Pedidos</a>
+    <a href="reports.html"   class="admin-nav-item">📈 Reportes</a>
+    <hr style="border-color:var(--border);margin:1rem 0">
+    <a href="../index.html"  class="admin-nav-item">🏪 Ver tienda</a>
+  </aside>
+
+  <main class="admin-content">
+    <div class="admin-content__header">
+      <h1 class="admin-content__title">Pedidos</h1>
+    </div>
+
+    <!-- Filtros de estado -->
+    <div class="filter-chips" style="margin-bottom:1.25rem" id="status-filter">
+      <span class="chip active" data-status="">Todos</span>
+      <span class="chip" data-status="pending">Pendientes</span>
+      <span class="chip" data-status="paid">Pagados</span>
+      <span class="chip" data-status="shipped">Enviados</span>
+      <span class="chip" data-status="delivered">Entregados</span>
+      <span class="chip" data-status="cancelled">Cancelados</span>
+    </div>
+
+    <div class="table-wrap" id="orders-table">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal detalle de pedido -->
+<div class="modal-overlay" id="order-modal" style="display:none">
+  <div class="modal" style="max-width:600px">
+    <div class="modal__header">
+      <h2 class="modal__title" id="order-modal-title">Pedido #</h2>
+      <button onclick="closeOrderModal()" style="color:var(--gray);font-size:1.3rem">✕</button>
+    </div>
+    <div id="order-modal-body"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { orders, requireAuth, logout, showToast } from '../js/api.js';
+
+  if (!requireAuth(true)) throw new Error();
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  let currentStatus = '';
+
+  const STATUS_LABELS = {
+    pending:'Pendiente', paid:'Pagado', shipped:'Enviado',
+    delivered:'Entregado', cancelled:'Cancelado'
+  };
+  const STATUS_CLS = {
+    pending:'badge-pending', paid:'badge-paid', shipped:'badge-shipped',
+    delivered:'badge-delivered', cancelled:'badge-cancelled'
+  };
+
+  // ── Render tabla de pedidos ───────────────────────────────
+  function renderTable(list) {
+    const el = document.getElementById('orders-table');
+    if (!list.length) {
+      el.innerHTML = '<p style="padding:1.5rem;color:var(--gray)">Sin pedidos para este filtro</p>';
+      return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Cliente</th><th>Fecha</th>
+            <th>Total</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(o => {
+            const date = new Date(o.created_at).toLocaleDateString('es-MX',
+              {day:'2-digit',month:'short',year:'numeric'});
+            return `
+            <tr>
+              <td style="color:var(--gold);font-weight:600">#${o.id}</td>
+              <td>
+                <p style="font-weight:500">${o.customer_name}</p>
+                <p style="font-size:.72rem;color:var(--gray)">${o.customer_email}</p>
+              </td>
+              <td style="color:var(--gray);font-size:.85rem">${date}</td>
+              <td>$${Number(o.total).toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+              <td><span class="badge ${STATUS_CLS[o.status]}">${STATUS_LABELS[o.status]}</span></td>
+              <td>
+                <div style="display:flex;gap:.5rem;align-items:center">
+                  <button class="btn btn-outline btn-sm" onclick="viewOrder(${o.id})">Ver</button>
+                  <select onchange="updateStatus(${o.id}, this.value)"
+                          style="width:auto;padding:.3rem .6rem;font-size:.78rem">
+                    <option value="">Cambiar estado</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="paid">Pagado</option>
+                    <option value="shipped">Enviado</option>
+                    <option value="delivered">Entregado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Cargar pedidos ────────────────────────────────────────
+  async function loadOrders() {
+    const data = await orders.all({ status: currentStatus || undefined, limit: 50 });
+    renderTable(data);
+  }
+
+  // ── Filtros de chips ──────────────────────────────────────
+  document.querySelectorAll('#status-filter .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#status-filter .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentStatus = chip.dataset.status;
+      loadOrders();
+    });
+  });
+
+  // ── Actualizar estado ─────────────────────────────────────
+  window.updateStatus = async (id, status) => {
+    if (!status) return;
+    try {
+      await orders.updateStatus(id, status);
+      showToast(`Pedido #${id} → ${STATUS_LABELS[status]}`, 'success');
+      loadOrders();
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // ── Ver detalle del pedido ────────────────────────────────
+  window.viewOrder = async (id) => {
+    const o = await orders.get(id);
+    document.getElementById('order-modal-title').textContent = `Pedido #${o.id}`;
+    const date = new Date(o.created_at).toLocaleDateString('es-MX',
+      {year:'numeric',month:'long',day:'numeric'});
+
+    document.getElementById('order-modal-body').innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:1.25rem">
+        <div>
+          <p style="color:var(--gray);font-size:.8rem">Fecha</p>
+          <p>${date}</p>
+        </div>
+        <span class="badge ${STATUS_CLS[o.status]}">${STATUS_LABELS[o.status]}</span>
+      </div>
+
+      ${o.shipping_name ? `
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.85rem">
+          <p style="color:var(--gold);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.3rem">Envío a</p>
+          <p><strong>${o.shipping_name}</strong></p>
+          <p style="color:var(--gray)">${o.shipping_address}</p>
+          <p style="color:var(--gray)">${o.shipping_phone}</p>
+          ${o.notes ? `<p style="color:var(--gray);margin-top:.25rem;font-style:italic">"${o.notes}"</p>` : ''}
+        </div>
+      ` : ''}
+
+      <p style="font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:.5rem">Productos</p>
+      ${o.items.map(i => `
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;
+                    padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div>
+            <p>${i.product_name}</p>
+            <p style="color:var(--gray);font-size:.75rem">${i.brand_name} · ${i.size} · ${i.color}</p>
+          </div>
+          <div style="text-align:right">
+            <p>×${i.quantity}</p>
+            <p style="color:var(--gold)">$${Number(i.subtotal).toLocaleString('es-MX',{minimumFractionDigits:2})}</p>
+          </div>
+        </div>
+      `).join('')}
+
+      <div style="display:flex;justify-content:space-between;font-weight:600;
+                  margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">
+        <span>Total</span>
+        <span style="color:var(--gold-lt)">$${Number(o.total).toLocaleString('es-MX',{minimumFractionDigits:2})} MXN</span>
+      </div>
+
+      <button class="btn btn-primary" onclick="closeOrderModal()" style="width:100%;margin-top:1.25rem">
+        Cerrar
+      </button>
+    `;
+    document.getElementById('order-modal').style.display = 'flex';
+  };
+
+  window.closeOrderModal = () => {
+    document.getElementById('order-modal').style.display = 'none';
+  };
+
+  loadOrders().catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>

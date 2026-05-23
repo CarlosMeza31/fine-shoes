@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Admin Dashboard</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="../index.html" class="navbar__logo">Fine Shoes</a>
+  <span style="font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;
+               color:var(--gold);background:rgba(201,168,76,.1);
+               padding:.2rem .6rem;border-radius:999px;border:1px solid rgba(201,168,76,.3)">
+    Panel Admin
+  </span>
+  <div style="margin-left:auto">
+    <button id="nav-logout" class="btn btn-outline btn-sm">Cerrar sesión</button>
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <p class="admin-sidebar__title">Navegación</p>
+    <a href="dashboard.html" class="admin-nav-item active">📊 Dashboard</a>
+    <a href="products.html"  class="admin-nav-item">👟 Productos</a>
+    <a href="orders.html"    class="admin-nav-item">📦 Pedidos</a>
+    <a href="reports.html"   class="admin-nav-item">📈 Reportes</a>
+    <hr style="border-color:var(--border);margin:1rem 0">
+    <a href="../index.html"  class="admin-nav-item">🏪 Ver tienda</a>
+  </aside>
+
+  <!-- Contenido -->
+  <main class="admin-content">
+    <div class="admin-content__header">
+      <h1 class="admin-content__title">Dashboard</h1>
+      <span id="greeting" style="color:var(--gray);font-size:.88rem"></span>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><p class="stat-card__label">Cargando...</p></div>
+    </div>
+
+    <!-- Fila inferior: top productos + últimos pedidos -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+      <!-- Top productos -->
+      <div>
+        <h2 style="font-size:1rem;letter-spacing:.05em;margin-bottom:.75rem;color:var(--gray)">
+          TOP PRODUCTOS
+        </h2>
+        <div class="table-wrap" id="top-products">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Últimos pedidos -->
+      <div>
+        <h2 style="font-size:1rem;letter-spacing:.05em;margin-bottom:.75rem;color:var(--gray)">
+          ÚLTIMOS PEDIDOS
+        </h2>
+        <div class="table-wrap" id="recent-orders">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { reports, orders, requireAuth, logout, getUser, showToast } from '../js/api.js';
+
+  if (!requireAuth(true)) throw new Error();
+  document.getElementById('nav-logout').addEventListener('click', logout);
+
+  const user = getUser();
+  document.getElementById('greeting').textContent =
+    `Hola, ${user?.name?.split(' ')[0] || 'Admin'} 👋`;
+
+  // ── Cargar resumen ────────────────────────────────────────
+  async function loadSummary() {
+    const s = await reports.summary();
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card">
+        <p class="stat-card__label">Clientes</p>
+        <p class="stat-card__value">${s.total_customers.toLocaleString()}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-card__label">Pedidos totales</p>
+        <p class="stat-card__value">${s.total_orders.toLocaleString()}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-card__label">Ingresos</p>
+        <p class="stat-card__value">$${Number(s.total_revenue).toLocaleString('es-MX',{minimumFractionDigits:0})}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-card__label">Productos activos</p>
+        <p class="stat-card__value">${s.total_products}</p>
+      </div>
+      <div class="stat-card" style="border-color:rgba(201,168,76,.3)">
+        <p class="stat-card__label">Pedidos pendientes</p>
+        <p class="stat-card__value" style="color:var(--gold)">${s.pending_orders}</p>
+      </div>
+    `;
+  }
+
+  // ── Top productos ─────────────────────────────────────────
+  async function loadTopProducts() {
+    const data = await reports.byProduct(5);
+    const el = document.getElementById('top-products');
+    if (!data.length) { el.innerHTML = '<p style="padding:1rem;color:var(--gray)">Sin ventas aún</p>'; return; }
+
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Producto</th><th>Vendidos</th><th>Ingresos</th></tr></thead>
+        <tbody>
+          ${data.map((p,i) => `
+            <tr>
+              <td style="color:var(--gold);font-weight:700">${i+1}</td>
+              <td>
+                <p style="font-weight:500">${p.product_name}</p>
+                <p style="font-size:.75rem;color:var(--gray)">${p.brand}</p>
+              </td>
+              <td>${p.total_sold}</td>
+              <td>$${Number(p.total_revenue).toLocaleString('es-MX',{minimumFractionDigits:0})}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Últimos pedidos ───────────────────────────────────────
+  async function loadRecentOrders() {
+    const data = await orders.all({ limit: 5 });
+    const el = document.getElementById('recent-orders');
+    const STATUS = {
+      pending:'badge-pending',paid:'badge-paid',shipped:'badge-shipped',
+      delivered:'badge-delivered',cancelled:'badge-cancelled'
+    };
+    const LABELS = {
+      pending:'Pendiente',paid:'Pagado',shipped:'Enviado',
+      delivered:'Entregado',cancelled:'Cancelado'
+    };
+
+    if (!data.length) { el.innerHTML = '<p style="padding:1rem;color:var(--gray)">Sin pedidos aún</p>'; return; }
+
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${data.map(o => `
+            <tr>
+              <td style="color:var(--gold)">#${o.id}</td>
+              <td>
+                <p style="font-weight:500">${o.customer_name}</p>
+                <p style="font-size:.72rem;color:var(--gray)">${o.customer_email}</p>
+              </td>
+              <td>$${Number(o.total).toLocaleString('es-MX',{minimumFractionDigits:0})}</td>
+              <td><span class="badge ${STATUS[o.status]}">${LABELS[o.status]}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  Promise.all([loadSummary(), loadTopProducts(), loadRecentOrders()])
+    .catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>

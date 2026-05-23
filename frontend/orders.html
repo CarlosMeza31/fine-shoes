@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fine Shoes — Mis pedidos</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar__logo">Fine Shoes</a>
+  <ul class="navbar__links">
+    <li><a href="index.html">Catálogo</a></li>
+    <li><a href="orders.html" style="color:var(--gold)">Mis Pedidos</a></li>
+  </ul>
+  <div class="navbar__actions">
+    <a href="cart.html" class="navbar__cart-btn">
+      🛒 <span class="cart-badge" style="display:none">0</span>
+    </a>
+    <button id="nav-logout" class="btn btn-outline btn-sm">Salir</button>
+  </div>
+</nav>
+
+<div style="max-width:800px;margin:2rem auto;padding:0 2rem">
+  <h1 class="section-title">Mis pedidos</h1>
+  <div id="orders-list">
+    <div class="loading-state"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<script type="module">
+  import { orders, requireAuth, logout, refreshCartBadge, showToast } from './js/api.js';
+
+  if (!requireAuth()) throw new Error();
+  document.getElementById('nav-logout').addEventListener('click', logout);
+  refreshCartBadge();
+
+  const STATUS_LABELS = {
+    pending:   { label: 'Pendiente',   cls: 'badge-pending' },
+    paid:      { label: 'Pagado',      cls: 'badge-paid' },
+    shipped:   { label: 'Enviado',     cls: 'badge-shipped' },
+    delivered: { label: 'Entregado',   cls: 'badge-delivered' },
+    cancelled: { label: 'Cancelado',   cls: 'badge-cancelled' },
+  };
+
+  async function load() {
+    const list = await orders.mine();
+    const container = document.getElementById('orders-list');
+
+    if (!list.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon">📦</div>
+          <div class="empty-state__title">Aún no tienes pedidos</div>
+          <p>Explora el catálogo y realiza tu primera compra</p>
+          <a href="index.html" class="btn btn-primary" style="margin-top:1rem">Ver catálogo</a>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = list.map(o => {
+      const st = STATUS_LABELS[o.status] || { label: o.status, cls: '' };
+      const date = new Date(o.created_at).toLocaleDateString('es-MX',
+        { year:'numeric', month:'long', day:'numeric' });
+
+      return `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);
+                  padding:1.25rem;margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div>
+            <span style="font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gray)">
+              Pedido
+            </span>
+            <p style="font-weight:600;font-size:1.05rem">#${o.id}</p>
+            <p style="font-size:.8rem;color:var(--gray)">${date}</p>
+          </div>
+          <span class="badge ${st.cls}">${st.label}</span>
+        </div>
+
+        <!-- Items del pedido -->
+        ${o.items.map(item => `
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;
+                      padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            <span>${item.product_name} ×${item.quantity}</span>
+            <span style="color:var(--gray)">
+              $${Number(item.subtotal).toLocaleString('es-MX',{minimumFractionDigits:2})}
+            </span>
+          </div>
+        `).join('')}
+
+        <div style="display:flex;justify-content:space-between;margin-top:.75rem;font-weight:600">
+          <span>Total</span>
+          <span style="color:var(--gold)">
+            $${Number(o.total).toLocaleString('es-MX',{minimumFractionDigits:2})} MXN
+          </span>
+        </div>
+
+        ${o.shipping_address ? `
+          <p style="font-size:.78rem;color:var(--gray);margin-top:.5rem">
+            📦 ${o.shipping_name} · ${o.shipping_address}
+          </p>
+        ` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  load().catch(e => showToast(e.message, 'error'));
+</script>
+</body>
+</html>
