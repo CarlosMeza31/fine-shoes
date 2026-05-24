@@ -110,7 +110,7 @@ export const reports = {
 export function logout() {
   removeToken();
   removeUser();
-  window.location.href = '/frontend/login.html';
+  window.location.href = '/fine-shoes/login.html';
 }
 
 // ── Proteger rutas ─────────────────────────────────────────────
@@ -120,11 +120,11 @@ export function logout() {
  */
 export function requireAuth(adminOnly = false) {
   if (!isLoggedIn()) {
-    window.location.href = '/login.html';
+    window.location.href = '/fine-shoes/login.html';  // 
     return false;
   }
   if (adminOnly && !isAdmin()) {
-    window.location.href = '/index.html';
+    window.location.href = '/fine-shoes/index.html';  // 
     return false;
   }
   return true;

@@ -44,7 +44,9 @@ class UserOut(BaseModel):
     role: str
     phone: Optional[str]
     address: Optional[str]
-    created_at: datetime
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 
 
 class TokenOut(BaseModel):
