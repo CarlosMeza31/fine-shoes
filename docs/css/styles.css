@@ -380,6 +380,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--gold); }
   display: flex; align-items: center; justify-content: center;
   font-size: 1rem;
   transition: border-color var(--transition);
+  color: var(--white);
 }
 .qty-btn:hover { border-color: var(--gold); color: var(--gold); }
 
