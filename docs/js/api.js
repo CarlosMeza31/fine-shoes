@@ -76,6 +76,16 @@ export const brands = {
   list: () => request('/brands'),
 };
 
+// ── Colores (dinámicos desde el inventario activo) ───────────────
+export const colors = {
+  list: () => request('/colors'),
+};
+
+// ── Tallas (dinámicas desde el inventario activo) ────────────────
+export const sizes = {
+  list: () => request('/sizes'),
+};
+
 // ── Carrito ────────────────────────────────────────────────────
 export const cart = {
   get:    ()        => request('/cart/'),

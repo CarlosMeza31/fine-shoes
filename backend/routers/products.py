@@ -64,11 +64,12 @@ def get_product_with_inventory(cursor, product_id: int) -> Optional[dict]:
 @router.get("/")
 def list_products(
     brand: Optional[str] = Query(None, description="Slug de marca: nike, adidas..."),
-    size:  Optional[str] = Query(None, description="Talla: 40, 41..."),
-    color: Optional[str] = Query(None, description="Color"),
+    size:  Optional[str] = Query(None, description="Talla: 25, 26, 27..."),
+    color: Optional[str] = Query(None, description="Color: Negro, Blanco..."),
     q:     Optional[str] = Query(None, description="Búsqueda por nombre"),
     min_price: Optional[float] = Query(None, ge=0),
     max_price: Optional[float] = Query(None, ge=0),
+    sort:  Optional[str] = Query(None, description="Orden: price_asc, price_desc, name_asc, newest"),
     page:  int = Query(1, ge=1),
     limit: int = Query(12, ge=1, le=50),
     db: MySQLConnection = Depends(get_db),
@@ -99,6 +100,15 @@ def list_products(
 
     where = " AND ".join(conditions)
 
+    # Ordenamiento — se calcula antes de usarse en la query
+    _sort_map = {
+        'price_asc':  'p.price ASC',
+        'price_desc': 'p.price DESC',
+        'name_asc':   'p.name ASC',
+        'newest':     'p.created_at DESC',
+    }
+    order_by = _sort_map.get(sort or '', 'p.created_at DESC')
+
     # Total para paginación
     cursor.execute(
         f"SELECT COUNT(*) AS total FROM products p JOIN brands b ON b.id = p.brand_id WHERE {where}",
@@ -112,7 +122,7 @@ def list_products(
             FROM products p
             JOIN brands b ON b.id = p.brand_id
             WHERE {where}
-            ORDER BY p.created_at DESC
+            ORDER BY {order_by}
             LIMIT %s OFFSET %s""",
         [*params, limit, offset],
     )

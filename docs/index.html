@@ -42,35 +42,59 @@
 
   <!-- Filtros -->
   <aside class="filters">
-    <p class="filters__title">Filtros</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <p class="filters__title" style="margin:0">Filtros</p>
+      <span id="active-filter-badge" style="display:none;
+            font-size:.7rem;font-weight:700;background:var(--gold);
+            color:#000;border-radius:999px;padding:.15rem .55rem">0</span>
+    </div>
 
+    <!-- Marca -->
     <div class="filter-group">
       <span class="filter-group__label">Marca</span>
       <div class="filter-chips" id="brand-chips">
         <span class="chip active" data-brand="">Todas</span>
-        <!-- Se llenan dinámicamente desde la API -->
+        <!-- Se llenan dinámicamente desde /brands -->
       </div>
     </div>
 
+    <!-- Talla (dinámicas desde /sizes) -->
     <div class="filter-group">
       <span class="filter-group__label">Talla</span>
       <div class="filter-chips" id="size-chips">
         <span class="chip active" data-size="">Todas</span>
-        <span class="chip" data-size="38">25</span>
-        <span class="chip" data-size="39">26</span>
-        <span class="chip" data-size="40">27</span>
-        <span class="chip" data-size="41">28</span>
-        <span class="chip" data-size="42">29</span>
+        <!-- Se llenan dinámicamente desde /sizes -->
       </div>
     </div>
 
+    <!-- Color (dinámico desde /colors) -->
     <div class="filter-group">
-      <span class="filter-group__label">Precio</span>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <input type="number" id="min-price" placeholder="Mín" style="width:100%;">
-        <span style="color:var(--gray)">—</span>
-        <input type="number" id="max-price" placeholder="Máx" style="width:100%;">
+      <span class="filter-group__label">Color</span>
+      <div class="filter-chips" id="color-chips">
+        <span class="chip active" data-color="">Todos</span>
+        <!-- Se llenan dinámicamente desde /colors -->
       </div>
+    </div>
+
+    <!-- Precio -->
+    <div class="filter-group">
+      <span class="filter-group__label">Precio (MXN)</span>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="number" id="min-price" placeholder="Mín" min="0" style="width:100%;">
+        <span style="color:var(--gray)">—</span>
+        <input type="number" id="max-price" placeholder="Máx" min="0" style="width:100%;">
+      </div>
+    </div>
+
+    <!-- Ordenar -->
+    <div class="filter-group">
+      <span class="filter-group__label">Ordenar por</span>
+      <select id="sort-select" style="width:100%">
+        <option value="newest">Más recientes</option>
+        <option value="price_asc">Precio: menor a mayor</option>
+        <option value="price_desc">Precio: mayor a menor</option>
+        <option value="name_asc">Nombre A–Z</option>
+      </select>
     </div>
 
     <button class="btn btn-outline" id="clear-filters" style="width:100%;margin-top:.5rem">
@@ -92,13 +116,22 @@
 </section>
 
 <script type="module">
-  import { products, brands, isLoggedIn, isAdmin, logout,
+  import { products, brands, colors, sizes, isLoggedIn, isAdmin, logout,
            refreshCartBadge, showToast } from './js/api.js';
 
-  // Estado de los filtros
-  const state = { brand: '', size: '', q: '', min_price: '', max_price: '', page: 1 };
+  // Estado completo de filtros
+  const state = { brand: '', size: '', color: '', q: '', min_price: '', max_price: '', sort: 'newest', page: 1 };
 
-  // ── Mostrar/ocultar nav según sesión ──────────────────────
+  // ── Contador de filtros activos ─────────────────────────────────
+  function updateFilterBadge() {
+    const active = [state.brand, state.size, state.color, state.q,
+                    state.min_price, state.max_price].filter(Boolean).length;
+    const badge = document.getElementById('active-filter-badge');
+    badge.textContent = active;
+    badge.style.display = active ? 'inline-block' : 'none';
+  }
+
+  // ── Mostrar/ocultar nav según sesión ────────────────────────
   if (isLoggedIn()) {
     document.getElementById('nav-login').style.display = 'none';
     document.getElementById('nav-logout').style.display = '';
@@ -111,7 +144,7 @@
   document.getElementById('nav-logout')?.addEventListener('click', logout);
   refreshCartBadge();
 
-  // ── Cargar marcas en los chips ────────────────────────────
+  // ── Cargar marcas ─────────────────────────────────────────
   async function loadBrands() {
     const data = await brands.list();
     const container = document.getElementById('brand-chips');
@@ -122,10 +155,49 @@
       chip.textContent = b.name;
       container.appendChild(chip);
     });
-    attachChipListeners();
   }
 
-  // ── Render de productos ───────────────────────────────────
+  // ── Cargar tallas dinámicamente desde /sizes ────────────────────
+  async function loadSizes() {
+    try {
+      const data = await sizes.list();
+      const container = document.getElementById('size-chips');
+      data.forEach(s => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.dataset.size = s;
+        chip.textContent = s;
+        container.appendChild(chip);
+      });
+    } catch {
+      const fallback = ['25','26','27','28','29'];
+      const container = document.getElementById('size-chips');
+      fallback.forEach(s => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.dataset.size = s;
+        chip.textContent = s;
+        container.appendChild(chip);
+      });
+    }
+  }
+
+  // ── Cargar colores dinámicamente desde /colors ─────────────────
+  async function loadColors() {
+    try {
+      const data = await colors.list();
+      const container = document.getElementById('color-chips');
+      data.forEach(c => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.dataset.color = c;
+        chip.textContent = c;
+        container.appendChild(chip);
+      });
+    } catch { }
+  }
+
+  // ── Render de productos ────────────────────────────────────
   function renderProducts(list) {
     const grid = document.getElementById('products-grid');
     if (!list.length) {
@@ -156,7 +228,7 @@
     `).join('');
   }
 
-  // ── Paginación ────────────────────────────────────────────
+  // ── Paginación ───────────────────────────────────────────
   function renderPagination(pagination) {
     const container = document.getElementById('pagination');
     if (pagination.pages <= 1) { container.innerHTML = ''; return; }
@@ -173,10 +245,11 @@
   async function loadProducts() {
     document.getElementById('products-grid').innerHTML =
       '<div class="loading-state"><div class="spinner"></div></div>';
+    updateFilterBadge();
     try {
       const res = await products.list({ ...state });
       const count = document.getElementById('results-count');
-      count.textContent = `${res.pagination.total} productos`;
+      count.textContent = `${res.pagination.total} producto${res.pagination.total !== 1 ? 's' : ''}`;
       renderProducts(res.products);
       renderPagination(res.pagination);
     } catch (e) {
@@ -186,23 +259,13 @@
 
   window.setPage = (n) => { state.page = n; loadProducts(); };
 
-  // ── Chips de filtro ───────────────────────────────────────
-  function attachChipListeners() {
-    document.querySelectorAll('#brand-chips .chip').forEach(chip => {
+  // ── Adjuntar listeners a chips ──────────────────
+  function makeChipListener(containerId, stateKey) {
+    document.querySelectorAll(`#${containerId} .chip`).forEach(chip => {
       chip.addEventListener('click', () => {
-        document.querySelectorAll('#brand-chips .chip').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll(`#${containerId} .chip`).forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
-        state.brand = chip.dataset.brand;
-        state.page = 1;
-        loadProducts();
-      });
-    });
-
-    document.querySelectorAll('#size-chips .chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        document.querySelectorAll('#size-chips .chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        state.size = chip.dataset.size;
+        state[stateKey] = chip.dataset[stateKey] || '';
         state.page = 1;
         loadProducts();
       });
@@ -210,8 +273,6 @@
   }
 
   // ── Búsqueda con debounce ─────────────────────────────────
-  // debounce: espera 400ms después de que el usuario deja de escribir
-  // — evita mandar una petición por cada tecla presionada
   let searchTimer;
   document.getElementById('search-input').addEventListener('input', e => {
     clearTimeout(searchTimer);
@@ -222,7 +283,7 @@
     }, 400);
   });
 
-  // ── Filtro de precio ──────────────────────────────────────
+  // ── Filtro de precio ────────────────────────────────────
   let priceTimer;
   ['min-price','max-price'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
@@ -236,21 +297,37 @@
     });
   });
 
-  // ── Limpiar filtros ───────────────────────────────────────
-  document.getElementById('clear-filters').addEventListener('click', () => {
-    Object.assign(state, { brand:'', size:'', q:'', min_price:'', max_price:'', page:1 });
-    document.getElementById('search-input').value = '';
-    document.getElementById('min-price').value = '';
-    document.getElementById('max-price').value = '';
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    document.querySelector('[data-brand=""]').classList.add('active');
-    document.querySelector('[data-size=""]').classList.add('active');
+  // ── Sort ─────────────────────────────────────────────────
+  document.getElementById('sort-select').addEventListener('change', e => {
+    state.sort = e.target.value;
+    state.page = 1;
     loadProducts();
   });
 
-  // ── Inicializar ───────────────────────────────────────────
-  loadBrands();
-  loadProducts();
+  // ── Limpiar filtros ────────────────────────────────────
+  document.getElementById('clear-filters').addEventListener('click', () => {
+    Object.assign(state, { brand:'', size:'', color:'', q:'', min_price:'', max_price:'', sort:'newest', page:1 });
+    document.getElementById('search-input').value = '';
+    document.getElementById('min-price').value = '';
+    document.getElementById('max-price').value = '';
+    document.getElementById('sort-select').value = 'newest';
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-brand=""]').classList.add('active');
+    document.querySelector('[data-size=""]').classList.add('active');
+    document.querySelector('[data-color=""]').classList.add('active');
+    loadProducts();
+  });
+
+  // ── Inicializar: carga en paralelo, luego adjunta listeners ───────
+  (async () => {
+    await Promise.all([loadBrands(), loadSizes(), loadColors()]);
+    // IMPORTANTE: adjuntar listeners DESPUÉS de que los chips
+    // dinámicos (tallas y colores) existan en el DOM
+    makeChipListener('brand-chips',  'brand');
+    makeChipListener('size-chips',   'size');
+    makeChipListener('color-chips',  'color');
+    loadProducts();
+  })();
 </script>
 </body>
 </html>

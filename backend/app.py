@@ -67,6 +67,34 @@ def get_brands(db: MySQLConnection = Depends(get_db)):
     return cursor.fetchall()
 
 
+@app.get("/colors", tags=["Colores"])
+def get_colors(db: MySQLConnection = Depends(get_db)):
+    """Devuelve los colores únicos del inventario de productos activos."""
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        """SELECT DISTINCT inv.color
+           FROM inventory inv
+           JOIN products p ON p.id = inv.product_id
+           WHERE p.is_active = TRUE AND inv.stock > 0
+           ORDER BY inv.color"""
+    )
+    return [row["color"] for row in cursor.fetchall()]
+
+
+@app.get("/sizes", tags=["Tallas"])
+def get_sizes(db: MySQLConnection = Depends(get_db)):
+    """Devuelve las tallas únicas del inventario de productos activos."""
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        """SELECT DISTINCT inv.size
+           FROM inventory inv
+           JOIN products p ON p.id = inv.product_id
+           WHERE p.is_active = TRUE AND inv.stock > 0
+           ORDER BY CAST(inv.size AS DECIMAL)"""
+    )
+    return [row["size"] for row in cursor.fetchall()]
+
+
 # ------------------------------------------------------------
 # Health check — útil para verificar que el servidor está vivo
 # ------------------------------------------------------------
