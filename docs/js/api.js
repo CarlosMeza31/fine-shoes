@@ -106,11 +106,21 @@ export const reports = {
   summary:   ()           => request('/reports/summary'),
 };
 
+// ── Ruta raíz relativa (funciona en local y en GitHub Pages) ──────
+/**
+ * Devuelve el prefijo relativo para navegar a la raíz del sitio.
+ * Desde /admin/xxx.html → '../'
+ * Desde cualquier otra página → './'
+ */
+function _root() {
+  return window.location.pathname.includes('/admin/') ? '../' : './';
+}
+
 // ── Logout ─────────────────────────────────────────────────────
 export function logout() {
   removeToken();
   removeUser();
-  window.location.href = '/fine-shoes/login.html';
+  window.location.href = _root() + 'login.html';
 }
 
 // ── Proteger rutas ─────────────────────────────────────────────
@@ -120,11 +130,11 @@ export function logout() {
  */
 export function requireAuth(adminOnly = false) {
   if (!isLoggedIn()) {
-    window.location.href = '/fine-shoes/login.html';  // 
+    window.location.href = _root() + 'login.html';
     return false;
   }
   if (adminOnly && !isAdmin()) {
-    window.location.href = '/fine-shoes/index.html';  // 
+    window.location.href = _root() + 'index.html';
     return false;
   }
   return true;

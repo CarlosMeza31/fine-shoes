@@ -23,10 +23,10 @@ INSERT INTO brands (name, slug) VALUES
 -- ------------------------------------------------------------
 INSERT INTO users (name, email, password, role) VALUES
   ('Admin Fine Shoes', 'admin@fineshoes.com',
-   '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewrpE1VRZ.7k8Y6K',
+   '$2b$12$MaOVxEjSxdgedXjFy6PlzOJ6QZ9cFWWO2df3zP12GxdiZnDXs2b.W',
    'admin'),
   ('Juan Pérez',       'juan@ejemplo.com',
-   '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewrpE1VRZ.7k8Y6K',
+   '$2b$12$MBpyEvUBKdsz3dxblq15Y.sw6xpBlj7.HTpRNuHovPkINYHt5624O',
    'customer');
 
 -- ------------------------------------------------------------

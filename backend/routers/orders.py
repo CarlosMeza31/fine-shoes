@@ -126,7 +126,8 @@ def my_orders(user=Depends(get_current_user), db: MySQLConnection = Depends(get_
     orders = cursor.fetchall()
     for order in orders:
         cursor.execute(
-            """SELECT p.name AS product_name, oi.quantity, oi.unit_price, oi.subtotal
+            """SELECT p.name AS product_name, oi.quantity, oi.unit_price,
+                      (oi.quantity * oi.unit_price) AS subtotal
                FROM order_items oi
                JOIN products p ON p.id = oi.product_id
                WHERE oi.order_id = %s""",
