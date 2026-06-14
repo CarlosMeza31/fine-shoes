@@ -9,7 +9,7 @@ Modelos Pydantic para validación de datos de entrada y salida.
   — sin que tú escribas ninguna validación manual.
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -38,6 +38,7 @@ class UserUpdate(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     email: str
@@ -48,6 +49,7 @@ class UserOut(BaseModel):
 
 
 class TokenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     access_token: str
     token_type: str = "bearer"
     user: UserOut
@@ -90,6 +92,7 @@ class ProductUpdate(BaseModel):
 
 
 class ProductOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     brand_id: int
     brand_name: str
@@ -116,6 +119,7 @@ class CartUpdate(BaseModel):
 
 
 class CartItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     inventory_id: int
     product_id: int
@@ -130,6 +134,7 @@ class CartItemOut(BaseModel):
 
 
 class CartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     items: List[CartItemOut]
     total: float
 
@@ -150,6 +155,7 @@ class OrderStatusUpdate(BaseModel):
 
 
 class OrderItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     product_name: str
     brand_name: str
     size: str
@@ -160,6 +166,7 @@ class OrderItemOut(BaseModel):
 
 
 class OrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     status: str
     subtotal: float
