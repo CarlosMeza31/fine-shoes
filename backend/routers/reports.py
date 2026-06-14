@@ -28,7 +28,12 @@ def sales_by_product(
     cursor.execute(
         "SELECT * FROM v_sales_by_product LIMIT %s", (limit,)
     )
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    # Convertir Decimal a float/int para serialización JSON correcta
+    for row in rows:
+        row["total_sold"]    = int(row["total_sold"])    if row["total_sold"]    is not None else 0
+        row["total_revenue"] = float(row["total_revenue"]) if row["total_revenue"] is not None else 0.0
+    return rows
 
 
 @router.get("/sales-by-month")
@@ -39,7 +44,12 @@ def sales_by_month(
     """Ventas totales agrupadas por mes"""
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM v_sales_by_month LIMIT 24")
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    # Convertir Decimal a float/int para serialización JSON correcta
+    for row in rows:
+        row["total_orders"]  = int(row["total_orders"])    if row["total_orders"]  is not None else 0
+        row["total_revenue"] = float(row["total_revenue"]) if row["total_revenue"] is not None else 0.0
+    return rows
 
 
 @router.get("/low-stock")
