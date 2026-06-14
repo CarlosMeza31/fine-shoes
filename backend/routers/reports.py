@@ -26,7 +26,21 @@ def sales_by_product(
     """Top productos por unidades vendidas"""
     cursor = db.cursor(dictionary=True)
     cursor.execute(
-        "SELECT * FROM v_sales_by_product LIMIT %s", (limit,)
+        """SELECT
+             p.id            AS product_id,
+             p.name          AS product_name,
+             b.name          AS brand,
+             SUM(oi.quantity)          AS total_sold,
+             SUM(oi.quantity * oi.unit_price) AS total_revenue
+           FROM order_items oi
+           JOIN products p ON p.id = oi.product_id
+           JOIN brands   b ON b.id = p.brand_id
+           JOIN orders   o ON o.id = oi.order_id
+           WHERE o.status NOT IN ('cancelled')
+           GROUP BY p.id, p.name, b.name
+           ORDER BY total_sold DESC
+           LIMIT %s""",
+        (limit,)
     )
     rows = cursor.fetchall()
     # Convertir Decimal a float/int para serialización JSON correcta
@@ -43,7 +57,17 @@ def sales_by_month(
 ):
     """Ventas totales agrupadas por mes"""
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM v_sales_by_month LIMIT 24")
+    cursor.execute(
+        """SELECT
+             DATE_FORMAT(created_at, '%Y-%m') AS month,
+             COUNT(*)                          AS total_orders,
+             SUM(total)                        AS total_revenue
+           FROM orders
+           WHERE status NOT IN ('cancelled')
+           GROUP BY month
+           ORDER BY month DESC
+           LIMIT 24"""
+    )
     rows = cursor.fetchall()
     # Convertir Decimal a float/int para serialización JSON correcta
     for row in rows:
